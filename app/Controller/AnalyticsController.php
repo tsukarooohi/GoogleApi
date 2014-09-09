@@ -9,37 +9,59 @@ class AnalyticsController extends AppController {
 	public $name = 'Analytics';
 	public $uses = [];
 	public $components = [];
+	public $client;
 
 
 	public function index() {
 
-		$client = $this->login();
-		$result = $this->get($client, 'ga:pageviews');
-		$data['PV'] = $result['rows'][0];
-		$result = $this->get($client, 'ga:users');
-		$data['Uni'] = $result['rows'][0];
-		$result = $this->get($client, 'ga:totalEvents', 'ga:eventLabel');
-		$data['Imp'][0] = $result['totalsForAllResults']['ga:totalEvents'];
-		$data['call'][0] = 22;
+		$service = $this->login();
+		$values = [
+			'ga' => Configure::read('ProfileIDs')['PC個別ID'],
+			'between' => ['start' => '2014-08-27', 'end' => '2014-08-27'],
+		];
+		$result = $this->getPv($service, $values);
+		$data['PC']['PV'] = $result['rows'][0];
+		$result = $this->getSession($service, $values);
+		$data['PC']['Session'] = $result['rows'][0];
+
+		$values = [
+			'ga' => Configure::read('ProfileIDs')['Mobile個別ID'],
+			'between' => ['start' => '2014-08-27', 'end' => '2014-08-27'],
+		];
+		$result = $this->getPv($service, $values);
+		$data['Mobile']['PV'] = $result['rows'][0];
+		$result = $this->getSession($service, $values);
+		$data['Mobile']['Session'] = $result['rows'][0];
 
 		pr($data);
 
 	}
 
-	private function get($client, $metrics, $dimensions=null, $sort=null) {
+	private function getPv($service, $values) {
 
-		$service = new Google_Service_Analytics($client);
 		return $service->data_ga->get(
-			'ga:' . Configure::read('ProfileIDs')['edsnv.com'], // XXXXX の部分は Analytics のビュー ID
-			'2014-08-01', // 開始日
-			'2014-08-01', // 終了日
-			$metrics, // 主要指標 (metrics)
-			array(
-				'dimensions' => $dimensions, // 副指標
-				'filters' => "ga:eventLabel=~相談電話_imp",
-				// 'sort' => '-ga:totalEvents', // - を付けると降順ソート
+			'ga:' . $values['ga'], // XXXXX の部分は Analytics のビュー ID
+			$values['between']['start'], // 開始日
+			$values['between']['end'], // 終了日
+			'ga:pageviews', // 主要指標 (metrics)
+			[
+				'dimensions' => null, // 副指標
 				'max-results' => 10, // 取得件数
-			)
+			]
+		);
+	}
+
+	private function getSession($service, $values) {
+
+		return $service->data_ga->get(
+			'ga:' . $values['ga'], // XXXXX の部分は Analytics のビュー ID
+			$values['between']['start'], // 開始日
+			$values['between']['end'], // 終了日
+			'ga:visits', // 主要指標 (metrics)
+			[
+				// 'dimensions' => 'ga:visitCount', // 副指標
+				'max-results' => 10, // 取得件数
+			]
 		);
 	}
 
@@ -54,6 +76,6 @@ class AnalyticsController extends AppController {
 			file_get_contents(WWW_ROOT . '/files/' . Configure::read('KeyFile'))
 		));
 
-		return $client;
+		return new Google_Service_Analytics($client);
 	}
 }
